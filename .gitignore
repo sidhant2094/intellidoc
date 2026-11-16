@@ -1,0 +1,41 @@
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Secrets / local
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Uploads / scratch
+tmp/
+*.log
+
+# Additional virtual environments and dependencies
+**/.venv/
+**/venv/
+**/node_modules/
+
+# Build and test outputs
+coverage/
+.nyc_output/
+*.egg-info/
+dist/
+build/
+
+# Local environment files (allow example templates)
+**/.env
+**/.env.*
+!**/.env.example
