@@ -105,3 +105,16 @@ Enhancement on top of 1.0; every 1.0 test and behavior is preserved (the no-key 
 - [x] **Tests.** 79 pass (21 new generation-reliability tests), Gemini mocked.
 - [x] **Live.** Smoke test passes for both models and embeddings. The browser workflow passed on both PDFs
       (`path=full`), including a real 503 recovered by retry; Ask IntelliDoc answered with Gemini.
+
+## 2.0.2: Deployment readiness (Render + Vercel)
+
+- [x] **CORS** from `FRONTEND_URL` / `ALLOWED_ORIGINS` / optional `CORS_ORIGIN_REGEX`; localhost only outside
+      `APP_ENV=production`; wildcards refused; methods and headers restricted; no credentials.
+- [x] **Frontend API base** from `VITE_API_BASE_URL`; empty locally (Vite proxy → :8000); Vercel builds fail
+      if it's missing.
+- [x] **Backend** start command `uvicorn app.main:app --host 0.0.0.0 --port $PORT`; Python pinned
+      (`backend/.python-version`), Node pinned (`engines`); `/api/health` used as the health check.
+- [x] **Uploads** over the limit rejected from `Content-Length` before the body is read (413 with CORS headers).
+- [x] **Secrets.** The key exists only in the backend environment; `frontend/.env.example` holds only the
+      public URL; `.env` stays untracked.
+- [x] **Docs.** `DEPLOYMENT.md`. Tests: 84 pass. Production-like cross-origin run verified locally.

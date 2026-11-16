@@ -47,7 +47,7 @@ function EngineStatus({ online }: { online: boolean | null }) {
     <span
       className="mr-1 hidden items-center gap-2 rounded-full bg-danger-soft px-2.5 py-1 text-[12.5px] font-medium text-danger sm:inline-flex"
       role="status"
-      title="Start the server with ./start.sh"
+      title="The server may be starting up; retrying automatically"
     >
       <span className="h-1.5 w-1.5 rounded-full bg-danger" />
       Can’t reach IntelliDoc

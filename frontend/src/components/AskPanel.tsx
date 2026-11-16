@@ -85,7 +85,7 @@ export function AskPanel({
             err?.code === 'session_expired'
               ? 'This analysis is no longer active. Run it again to keep asking questions.'
               : err?.code === 'backend_offline'
-                ? 'Can’t reach IntelliDoc right now. Check that the server is running.'
+                ? 'Can’t reach IntelliDoc right now. It may be starting up — please try again in a moment.'
                 : 'That question couldn’t be answered. Please try again.',
         },
       ])

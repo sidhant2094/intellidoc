@@ -20,6 +20,9 @@ Requirements: **Node 18+** and **Python 3.10+** (or [`uv`](https://docs.astral.s
 Open **http://localhost:5173**. The first run installs dependencies, and later runs re-install Python packages
 whenever `requirements*.txt` change. Press `Ctrl+C` to stop.
 
+**Deploying?** See [DEPLOYMENT.md](DEPLOYMENT.md) for Render (backend) + Vercel (frontend), including CORS
+(`FRONTEND_URL`, `ALLOWED_ORIGINS`, `APP_ENV`) and the frontend's `VITE_API_BASE_URL`.
+
 ### Optional: enable Gemini
 
 ```bash
@@ -200,7 +203,7 @@ Schemas: `backend/app/schemas.py` and http://127.0.0.1:8000/docs.
 ## Tests & checks
 
 ```bash
-cd backend && .venv/bin/python -m pytest      # 79 tests; Gemini is always mocked, no quota used
+cd backend && .venv/bin/python -m pytest      # 84 tests; Gemini is always mocked, no quota used
 cd frontend && npm run build && npx oxlint src  # type-check, production build, lint
 ```
 

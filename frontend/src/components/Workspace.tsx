@@ -164,7 +164,7 @@ export function Workspace({
             </Button>
             <p className="mt-2.5 min-h-5 text-center text-[13px] text-ink-3" aria-live="polite">
               {online === false
-                ? 'Can’t reach IntelliDoc — start the server with ./start.sh'
+                ? 'Can’t reach IntelliDoc yet — it may be starting up. Retrying automatically…'
                 : missing.length
                   ? `Add ${joinList(missing)} to continue`
                   : fileState?.status === 'inspecting'

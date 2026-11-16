@@ -6,11 +6,11 @@ import json
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import Body, FastAPI, File, Form, UploadFile
+from fastapi import Body, FastAPI, File, Form, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from . import errors
+from . import errors, settings
 from .config import MAX_FILE_BYTES, MAX_FILE_MB
 from .errors import AnalysisError
 from .pdf_extract import open_pdf
@@ -23,20 +23,50 @@ from .session import store
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("intellidoc")
 
-app = FastAPI(title="IntelliDoc API", version="2.0.0",
-              description="Persona-aware PDF section ranking. Runs fully locally.")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    get_service()  # reads Gemini configuration once and logs (server-side only) which features are enabled
+    yield
+
+
+app = FastAPI(title="IntelliDoc API", version="2.0.0", lifespan=lifespan,
+              description="Persona-aware PDF section ranking and grounded answers.")
 
 EXPERTISE = {"beginner": "Beginner", "intermediate": "Intermediate", "advanced": "Advanced"}
+UPLOAD_OVERHEAD_BYTES = 1024 * 1024  # multipart form overhead allowed on top of the PDF size limit
 
 
 def error_response(err: AnalysisError) -> JSONResponse:
     return JSONResponse({"error": err.to_dict()}, status_code=err.status)
+
+
+@app.middleware("http")
+async def reject_oversized_uploads(request: Request, call_next):
+    """Refuse oversized uploads from Content-Length before the body is received and spooled."""
+    if request.method == "POST" and request.url.path == "/api/analyze":
+        try:
+            length = int(request.headers.get("content-length", "0"))
+        except ValueError:
+            length = 0
+        if length > MAX_FILE_BYTES + UPLOAD_OVERHEAD_BYTES:
+            return error_response(errors.too_large(MAX_FILE_MB))
+    return await call_next(request)
+
+
+# Added after the size check so CORS is the outermost middleware: every response, including the
+# early 413, carries CORS headers and the browser can read the error.
+_origins = settings.cors_origins()
+_origin_regex = settings.cors_origin_regex()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins,
+    allow_origin_regex=_origin_regex,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
+    allow_credentials=False,
+    max_age=600,
+)
+log.info("CORS origins: %s%s", _origins or "none", f" + pattern {_origin_regex}" if _origin_regex else "")
 
 
 @app.get("/api/health")

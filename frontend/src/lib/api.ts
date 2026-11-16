@@ -1,5 +1,14 @@
 import type { AnalyzeResponse, ApiError, AskResponse, Profile, StreamEvent } from './types'
 
+/**
+ * Backend origin. Empty in local development: requests go to /api and the Vite dev server proxies them to
+ * http://127.0.0.1:8000. In production set VITE_API_BASE_URL to the backend URL (e.g. on Render).
+ * Only this public URL is ever configured in the frontend — never API keys.
+ */
+export const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/+$/, '')
+
+const url = (path: string) => `${API_BASE}${path}`
+
 export class AnalysisFailure extends Error {
   error: ApiError
   constructor(error: ApiError) {
@@ -11,7 +20,7 @@ export class AnalysisFailure extends Error {
 const OFFLINE: ApiError = {
   code: 'backend_offline',
   message: 'Can’t reach IntelliDoc.',
-  hint: 'Start the server with ./start.sh (see the README), then try again.',
+  hint: 'The server may be starting up or temporarily unavailable. Please try again in a moment.',
 }
 
 export interface Health {
@@ -21,7 +30,7 @@ export interface Health {
 
 export async function checkHealth(signal?: AbortSignal): Promise<Health | null> {
   try {
-    const res = await fetch('/api/health', { signal, cache: 'no-store' })
+    const res = await fetch(url('/api/health'), { signal, cache: 'no-store' })
     if (!res.ok) return null
     return (await res.json()) as Health
   } catch {
@@ -45,7 +54,7 @@ export async function analyze(
 
   let res: Response
   try {
-    res = await fetch('/api/analyze', { method: 'POST', body: form, signal })
+    res = await fetch(url('/api/analyze'), { method: 'POST', body: form, signal })
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e
     throw new AnalysisFailure(OFFLINE)
@@ -111,7 +120,7 @@ export async function analyze(
 export async function ask(sessionId: string, question: string, signal?: AbortSignal): Promise<AskResponse> {
   let res: Response
   try {
-    res = await fetch(`/api/session/${encodeURIComponent(sessionId)}/ask`, {
+    res = await fetch(url(`/api/session/${encodeURIComponent(sessionId)}/ask`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question }),
