@@ -37,28 +37,48 @@ def concept_vector(text: str) -> list[float]:
 
 
 class ApiErr(Exception):
-    def __init__(self, code: int, msg: str = "error", retry: str | None = None):
+    def __init__(self, code: int, msg: str = "error", retry: str | None = None, retry_after: str | None = None):
         super().__init__(msg)
         self.code = code
+        self.message = msg
         self.details = {"error": {"details": [{"retryDelay": retry}] if retry else []}}
+        self.response = SimpleNamespace(headers={"retry-after": retry_after} if retry_after else {})
+
+
+def response(text: str | None, finish: str = "STOP", thought: str | None = None, blocked: bool = False):
+    """A GenerateContentResponse-shaped object."""
+    parts = []
+    if thought:
+        parts.append(SimpleNamespace(text=thought, thought=True))
+    if text is not None:
+        parts.append(SimpleNamespace(text=text, thought=None))
+    return SimpleNamespace(
+        candidates=[SimpleNamespace(content=SimpleNamespace(parts=parts), finish_reason=SimpleNamespace(name=finish))],
+        prompt_feedback=SimpleNamespace(block_reason="SAFETY") if blocked else None,
+        usage_metadata=SimpleNamespace(prompt_token_count=10, candidates_token_count=5, thoughts_token_count=50),
+        model_version=None, text=text,
+    )
 
 
 class FakeModels:
     def __init__(self, gen=None, embed_error=None, gen_error=None,
-                 available=("gemini-3.8-flash", "gemini-embedding-001")):
+                 available=("gemini-3.8-flash", "gemini-embedding-001"), per_model=None, thinking=()):
         self.gen = gen or default_generate
         self.embed_error = embed_error
         self.gen_error = gen_error
         self.available = available
+        self.per_model = per_model or {}  # model -> callable(prompt, config) returning response / raising
+        self.thinking = set(thinking)
         self.embed_calls: list[int] = []
         self.gen_prompts: list[str] = []
+        self.gen_calls: list[tuple[str, object]] = []  # (model, config)
         self.list_calls = 0
 
     def list(self, config=None):
         self.list_calls += 1
         for n in self.available:
             action = "embedContent" if "embedding" in n else "generateContent"
-            yield SimpleNamespace(name=f"models/{n}", supported_actions=[action])
+            yield SimpleNamespace(name=f"models/{n}", supported_actions=[action], thinking=n in self.thinking)
 
     def embed_content(self, model, contents, config=None):
         if self.embed_error:
@@ -68,6 +88,9 @@ class FakeModels:
 
     def generate_content(self, model, contents, config=None):
         self.gen_prompts.append(contents)
+        self.gen_calls.append((model, config))
+        if model in self.per_model:
+            return self.per_model[model](contents, config)
         if self.gen_error:
             raise self.gen_error() if callable(self.gen_error) else self.gen_error
         out = self.gen(contents)
@@ -110,8 +133,9 @@ def default_generate(prompt: str):
     return {}
 
 
-def make_service(models: FakeModels, daily_limit: int = 0) -> GeminiService:
-    settings = GeminiSettings(api_key="test-key-not-real", enabled=True, model="gemini-3.8-flash",
+def make_service(models: FakeModels, daily_limit: int = 0, model: str = "gemini-3.8-flash",
+                 fallback: str = "", max_retries: int = 2) -> GeminiService:
+    settings = GeminiSettings(api_key="test-key-not-real", enabled=True, model=model,
                               embedding_model="gemini-embedding-001", embedding_dim=DIM, timeout_s=5,
-                              daily_limit=daily_limit)
+                              daily_limit=daily_limit, fallback_model=fallback, max_retries=max_retries)
     return GeminiService(settings, transport=SimpleNamespace(models=models))

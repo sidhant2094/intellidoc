@@ -89,5 +89,19 @@ Enhancement on top of 1.0; every 1.0 test and behavior is preserved (the no-key 
       end-to-end on 2 real PDFs × 3 server modes (no key, mocked Gemini, quota-exhausted 429): no console
       errors, no provider-revealing text on any screen, and 429 results identical to the no-key results.
 
-**Pending:** a live test with a real key. Run `cd backend && .venv/bin/python -m scripts.gemini_smoke`, then
-calibrate `SPREAD_FLOOR` on real documents.
+## 2.0.1: Gemini generation reliability fix (2026-11-17)
+
+- [x] **Audit.** Empty and `MAX_TOKENS` responses were treated as successes and then surfaced as "malformed
+      JSON". Thinking tokens consumed the output budget. Retries were a single fixed retry. Cooldown was
+      per capability, not per model. Model substitution guessed from the list (it could pick 404 models).
+- [x] **Model probe** (real key, 512 tokens, thinking low, no auto-retries). Primary
+      `gemini-3.1-flash-lite` (text + JSON, ~3 s); fallback `gemini-3.6-flash` (text + JSON, ~22–37 s).
+      3.8/3.7 returned 503, 3.5 a 504, 2.5 a 404.
+- [x] **Client.** Non-thought text extraction; empty/MAX_TOKENS detection with one larger-budget retry;
+      thinking only where model metadata supports it, with headroom; bounded exponential backoff + jitter;
+      RetryInfo/Retry-After; overall deadline; per-model cooldowns; one fallback model; embeddings independent.
+- [x] **Config.** `.env`: `GEMINI_MODEL=gemini-3.1-flash-lite`, `GEMINI_FALLBACK_MODEL=gemini-3.6-flash`
+      (key, enabled flag and embedding model unchanged). `.env.example` and README updated.
+- [x] **Tests.** 79 pass (21 new generation-reliability tests), Gemini mocked.
+- [x] **Live.** Smoke test passes for both models and embeddings. The browser workflow passed on both PDFs
+      (`path=full`), including a real 503 recovered by retry; Ask IntelliDoc answered with Gemini.

@@ -66,13 +66,15 @@ def test_client_initialization_and_key_not_exposed(monkeypatch):
     assert "super-secret-value" not in repr(svc.settings)
 
 
-def test_model_validation_substitutes_missing_model():
-    m = use(FakeModels(available=("gemini-2.5-flash", "gemini-3-flash", "gemini-3-flash-lite", "gemini-embedding-001")))
+def test_model_validation_uses_only_configured_models():
+    # The configured primary is missing; only the configured fallback may be used — never a guess from the list.
+    m = FakeModels(available=("gemini-2.5-flash", "gemini-3.1-flash-lite", "gemini-embedding-001"))
+    gclient.set_service(make_service(m, model="gemini-3.8-flash", fallback="gemini-3.1-flash-lite"))
     svc = gclient.get_service()
-    assert svc.resolve_model("generate") == "gemini-3-flash"
+    assert svc.generation_models() == ["gemini-3.1-flash-lite"]
     assert svc.resolve_model("embed") == "gemini-embedding-001"
-    svc.resolve_model("generate")
-    assert m.list_calls == 2  # cached per capability, not per request
+    svc.generation_models()
+    assert m.list_calls == 1  # model table cached
 
 
 def test_no_usable_model_raises():
@@ -119,7 +121,7 @@ def test_rate_limit_is_not_retried_and_opens_breaker():
     assert len(calls) == 1
 
 
-def test_timeout_retries_once_then_fails():
+def test_timeout_retries_with_bound_then_fails():
     calls = []
 
     def timeout():
@@ -129,7 +131,7 @@ def test_timeout_retries_once_then_fails():
     use(FakeModels(gen_error=timeout))
     with pytest.raises(GeminiUnavailable):
         gclient.get_service().generate_json("s", "p", {"type": "object"}, 100)
-    assert len(calls) == 2
+    assert len(calls) == 3  # 1 attempt + 2 bounded retries
 
 
 def test_auth_error_pauses_without_retry():
